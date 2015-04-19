@@ -2,42 +2,58 @@
 
 ;; This module defines Typed Racket's main base type environment.
 
-(require
- (for-template
-  (except-in racket -> ->* one-of/c class)
-  racket/unsafe/ops
-  racket/unsafe/undefined
-  (only-in racket/extflonum floating-point-bytes->extfl extfl->floating-point-bytes)
-  ;(only-in rnrs/lists-6 fold-left)
-  '#%paramz
-  "extra-procs.rkt"
-  (only-in '#%kernel [apply kernel:apply] [reverse kernel:reverse])
-  (only-in racket/private/pre-base new-apply-proc)
-  compatibility/mlist
-  racket/private/stx
-  (only-in mzscheme make-namespace)
-  (only-in racket/match/runtime match:error matchable? match-equality-test))
- "base-structs.rkt"
- racket/file
- (only-in racket/private/pre-base new-apply-proc)
- (only-in (types abbrev) [-Boolean B] [-Symbol Sym] -Flat)
- (only-in (types numeric-tower) [-Number N])
- (only-in (rep type-rep)
-          make-ClassTop
-          make-Name
-          make-ValuesDots
-          make-MPairTop
-          make-BoxTop make-ChannelTop make-VectorTop
-          make-ThreadCellTop
-          make-Ephemeron
-          make-CustodianBox
-          make-HeterogeneousVector
-          make-Continuation-Mark-Keyof
-          make-Continuation-Mark-KeyTop
-          make-Prompt-Tagof
-          make-Prompt-TagTop
-          make-StructType make-StructTypeTop
-          make-ListDots))
+(begin
+  (require
+   (for-template
+    (except-in racket -> ->* one-of/c class)
+    racket/unsafe/ops
+    racket/unsafe/undefined
+    (only-in racket/extflonum floating-point-bytes->extfl extfl->floating-point-bytes)
+    ;(only-in rnrs/lists-6 fold-left)
+    '#%paramz
+    "extra-procs.rkt"
+    (only-in '#%kernel [apply kernel:apply] [reverse kernel:reverse])
+    (only-in racket/private/pre-base new-apply-proc)
+    compatibility/mlist
+    racket/private/stx
+    (only-in mzscheme make-namespace)
+    (only-in racket/match/runtime match:error matchable? match-equality-test))
+   "base-structs.rkt"
+   racket/file
+   (only-in racket/private/pre-base new-apply-proc)
+   (only-in (types abbrev) [-Boolean B] [-Symbol Sym] -Flat)
+   (only-in (types numeric-tower) [-Number N])
+   (only-in (rep type-rep)
+            make-ClassTop
+            make-Name
+            make-ValuesDots
+            make-MPairTop
+            make-BoxTop make-ChannelTop make-VectorTop
+            make-ThreadCellTop
+            make-Ephemeron
+            make-CustodianBox
+            make-HeterogeneousVector
+            make-Continuation-Mark-Keyof
+            make-Continuation-Mark-KeyTop
+            make-Prompt-Tagof
+            make-Prompt-TagTop
+            make-StructType make-StructTypeTop
+            make-ListDots))
+
+  (define (pair-acc branches)
+    (-poly (a)
+      (let ([arg-type
+              (for/fold ([t a]) ([branch (in-list branches)])
+                (case branch
+                  [(A) (Un -Null (-pair t Univ))]
+                  [(D) (Un -Null (-pair Univ t))]))]
+            [acc-path
+              (for/list ([branch (in-list branches)])
+                (case branch
+                  [(A) -car]
+                  [(D) -cdr]))])
+        (->acc (list arg-type) a acc-path))))
+  )
 
 ;; Racket Reference
 ;; Section 4.1
@@ -461,106 +477,39 @@
 [keyword<? (->* (list -Keyword -Keyword) -Keyword B)]
 
 ;; Section 4.9 (Pairs and Lists)
-[car   (-poly (a b)
-              (cl->*
-               (->acc (list (-pair a b)) a (list -car))
-               (->* (list (-lst a)) a)))]
-[cdr   (-poly (a b)
-              (cl->*
-               (->acc (list (-pair a b)) b (list -cdr))
-               (->* (list (-lst a)) (-lst a))))]
+[car (pair-acc '(A))]
+[cdr (pair-acc '(D))]
 
-;; these type signatures do not cover all valid uses of these pair accessors
-[caar (-poly (a b c)
-             (cl->* [->acc (list (-pair (-pair a b) c)) a (list -car -car)]
-                    [-> (-lst (-pair a b)) a]
-                    [-> (-pair (-lst a) b) a]
-                    [-> (-lst (-lst a)) a]))]
-[cdar (-poly (a b c)
-             (cl->* [->acc (list (-pair (-pair a b) c)) b (list -cdr -car)]
-                    [-> (-lst (-pair a b)) b]
-                    [-> (-pair (-lst a) b) (-lst a)]
-                    [-> (-lst (-lst a)) (-lst a)]))]
-[cadr (-poly (a b c)
-             (cl->* [->acc (list (-pair a (-pair b c))) b (list -car -cdr)]
-                    [-> (-lst a) a]))]
-[cddr  (-poly (a b c)
-              (cl->* [->acc (list (-pair a (-pair b c))) c (list -cdr -cdr)]
-                     [-> (-lst a) (-lst a)]))]
+[caar (pair-acc '(A A))]
+[cadr (pair-acc '(A D))]
+[cdar (pair-acc '(D A))]
+[cddr (pair-acc '(D D))]
 
-[caaar (-poly (a b c d)
-              (cl->* [->acc (list (-pair (-pair (-pair a b) c) d)) a (list -car -car -car)]
-                     [-> (-lst (-lst (-lst a))) a]))]
-[cdaar (-poly (a b c d)
-              (cl->* [->acc (list (-pair (-pair (-pair a b) c) d)) b (list -cdr -car -car)]
-                     [-> (-lst (-lst (-lst a))) (-lst a)]))]
-[cadar (-poly (a b c d)
-              (cl->* [->acc (list (-pair (-pair a (-pair b c)) d)) b (list -car -cdr -car)]
-                     [-> (-lst (-lst a)) a]))]
-[cddar (-poly (a b c d)
-              (cl->* [->acc (list (-pair (-pair a (-pair b c)) d)) c (list -cdr -cdr -car)]
-                     [-> (-lst (-lst a)) (-lst a)]))]
-[caadr (-poly (a b c d)
-              (cl->* [->acc (list (-pair a (-pair (-pair b c) d))) b (list -car -car -cdr)]
-                     [-> (-lst (-lst a)) a]))]
-[cdadr (-poly (a b c d)
-              (cl->* [->acc (list (-pair a (-pair (-pair b c) d))) c (list -cdr -car -cdr)]
-                     [-> (-lst (-lst a)) (-lst a)]))]
-[caddr  (-poly (a b c d)
-              (cl->* [->acc (list (-pair a (-pair b (-pair c d)))) c (list -car -cdr -cdr)]
-                     [-> (-lst a) a]))]
-[cdddr (-poly (a b c d)
-              (cl->* [->acc (list (-pair a (-pair b (-pair c d)))) d (list -cdr -cdr -cdr)]
-                     [-> (-lst a) (-lst a)]))]
+[caaar (pair-acc '(A A A))]
+[caadr (pair-acc '(A A D))]
+[cadar (pair-acc '(A D A))]
+[caddr (pair-acc '(A D D))]
+[cdaar (pair-acc '(D A A))]
+[cdadr (pair-acc '(D A D))]
+[cddar (pair-acc '(D D A))]
+[cdddr (pair-acc '(D D D))]
 
-[caaaar (-poly (a b c d e)
-               (cl->* [->acc (list (-pair (-pair (-pair (-pair a b) c) d) e)) a (list -car -car -car -car)]
-                      [-> (-lst (-lst (-lst (-lst a)))) a]))]
-[cdaaar (-poly (a b c d e)
-               (cl->* [->acc (list (-pair (-pair (-pair (-pair a b) c) d) e)) b (list -cdr -car -car -car)]
-                      [-> (-lst (-lst (-lst (-lst a)))) (-lst a)]))]
-[cadaar (-poly (a b c d e)
-               (cl->* [->acc (list (-pair (-pair (-pair a (-pair b c)) d) e)) b (list -car -cdr -car -car)]
-                      [-> (-lst (-lst (-lst a))) a]))]
-[cddaar (-poly (a b c d e)
-               (cl->* [->acc (list (-pair (-pair (-pair b (-pair b c)) d) e)) c (list -cdr -cdr -car -car)]
-                      [-> (-lst (-lst (-lst a))) (-lst a)]))]
-[caadar (-poly (a b c d e)
-               (cl->* [->acc (list (-pair (-pair a (-pair (-pair b c) d)) e)) b (list -car -car -cdr -car)]
-                      [-> (-lst (-lst (-lst a))) a]))]
-[cdadar (-poly (a b c d e)
-               (cl->* [->acc (list (-pair (-pair a (-pair (-pair b c) d)) e)) c (list -cdr -car -cdr -car)]
-                      [-> (-lst (-lst (-lst a))) (-lst a)]))]
-[caddar (-poly (a b c d e)
-               (cl->* [->acc (list (-pair (-pair a (-pair b (-pair c d))) e)) c (list -car -cdr -cdr -car)]
-                      [-> (-lst (-lst a)) a]))]
-[cdddar (-poly (a b c d e)
-               (cl->* [->acc (list (-pair (-pair a (-pair b (-pair c d))) e)) d (list -cdr -cdr -cdr -car)]
-                      [-> (-lst (-lst a)) (-lst a)]))]
-[caaadr (-poly (a b c d e)
-               (cl->* [->acc (list (-pair a (-pair (-pair (-pair b c) d) e))) b (list -car -car -car -cdr)]
-                      [-> (-lst (-lst (-lst a))) a]))]
-[cdaadr (-poly (a b c d e)
-               (cl->* [->acc (list (-pair a (-pair (-pair (-pair b c) d) e))) c (list -cdr -car -car -cdr)]
-                      [-> (-lst (-lst (-lst a))) (-lst a)]))]
-[cadadr (-poly (a b c d e)
-               (cl->* [->acc (list (-pair a (-pair (-pair b (-pair c d)) e))) c (list -car -cdr -car -cdr)]
-                      [-> (-lst (-lst a)) a]))]
-[cddadr (-poly (a b c d e)
-               (cl->* [->acc (list (-pair a (-pair (-pair b (-pair c d)) e))) d (list -cdr -cdr -car -cdr)]
-                      [-> (-lst (-lst a)) (-lst a)]))]
-[caaddr (-poly (a b c d e)
-               (cl->* [->acc (list (-pair a (-pair b (-pair (-pair c d) e)))) c (list -car -car -cdr -cdr)]
-                      [-> (-lst (-lst a)) a]))]
-[cdaddr (-poly (a b c d e)
-               (cl->* [->acc (list (-pair a (-pair b (-pair (-pair c d) e)))) d (list -cdr -car -cdr -cdr)]
-                      [-> (-lst (-lst a)) (-lst a)]))]
-[cadddr (-poly (a b c d e)
-               (cl->* [->acc (list (-pair a (-pair b (-pair c (-pair d e))))) d (list -car -cdr -cdr -cdr)]
-                      [-> (-lst a) a]))]
-[cddddr (-poly (a b c d e)
-               (cl->* [->acc (list (-pair a (-pair b (-pair c (-pair d e))))) e (list -cdr -cdr -cdr -cdr)]
-                      [-> (-lst a) (-lst a)]))]
+[caaaar (pair-acc '(A A A A))]
+[caaadr (pair-acc '(A A A D))]
+[caadar (pair-acc '(A A D A))]
+[caaddr (pair-acc '(A A D D))]
+[cadaar (pair-acc '(A D A A))]
+[cadadr (pair-acc '(A D A D))]
+[caddar (pair-acc '(A D D A))]
+[cadddr (pair-acc '(A D D D))]
+[cdaaar (pair-acc '(D A A A))]
+[cdaadr (pair-acc '(D A A D))]
+[cdadar (pair-acc '(D A D A))]
+[cdaddr (pair-acc '(D A D D))]
+[cddaar (pair-acc '(D D A A))]
+[cddadr (pair-acc '(D D A D))]
+[cdddar (pair-acc '(D D D A))]
+[cddddr (pair-acc '(D D D D))]
 
 [first (-poly (a b)
               (cl->*

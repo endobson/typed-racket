@@ -527,9 +527,7 @@
         [tc-e (range 0.0 4/2 0.5) (-lst -Flonum)]
         [tc-e/t '(#t #f) (-lst* (-val #t) (-val #f))]
         [tc-e/t (plambda: (a) ([l : (Listof a)]) (car l))
-                (make-Poly '(a) (t:-> (make-Listof (-v a)) (-v a)))]
-        [tc-e/t (plambda: (a) ([l : (Listof a)]) (car l))
-                (make-Poly '(a) (t:-> (make-Listof (-v a)) (-v a)))]
+                (-poly (a) (->acc (list (make-Listof a)) a (list -car)))]
         [tc-e/t (case-lambda: [([a : Number] [b : Number]) (+ a b)]) (t:-> -Number -Number -Number)]
         [tc-e/t (tr:case-lambda [([a : Number] [b : Number]) (+ a b)])
                 (t:-> -Number -Number -Number)]
@@ -590,10 +588,10 @@
                             [(null? x) 1]))
               -One]
         [tc-e/t (lambda: ([x : Number] . [y : Number *]) (car y))
-                (->* (list -Number) -Number -Number)]
-        [tc-e ((lambda: ([x : Number] . [y : Number *]) (car y)) 3) -Number]
-        [tc-e ((lambda: ([x : Number] . [y : Number *]) (car y)) 3 4 5) -Number]
-        [tc-e ((lambda: ([x : Number] . [y : Number *]) (car y)) 3 4) -Number]
+                (->* (list -Number) -Number -Number : -true-filter)]
+        [tc-e/t ((lambda: ([x : Number] . [y : Number *]) (car y)) 3) -Number]
+        [tc-e/t ((lambda: ([x : Number] . [y : Number *]) (car y)) 3 4 5) -Number]
+        [tc-e/t ((lambda: ([x : Number] . [y : Number *]) (car y)) 3 4) -Number]
         [tc-e (apply (lambda: ([x : Number] . [y : Number *]) (car y)) 3 '(4)) -Number]
         [tc-e (apply (lambda: ([x : Number] . [y : Number *]) (car y)) 3 '(4 6 7)) -Number]
         [tc-e (apply (lambda: ([x : Number] . [y : Number *]) (car y)) 3 '()) -Number]
@@ -3632,6 +3630,102 @@
        [tc-e/t ((inst values Any) "a") -String]
        [tc-e ((inst second Any Any Any) (list "a" "b")) -String]
        [tc-e/t (abs 4) -PosByte]
+
+       ;; Car/Cdr paths for Listof type
+       [tc-e (let ()
+               (: x (Listof (U #f String)))
+               (define x (list "foo"))
+               (let ([y (car x)])
+                 (if (car x) (string-append y) "")))
+             -String]
+       [tc-e (let ()
+               (: x (Listof (U #f String)))
+               (define x (list "foo" "bar"))
+               (let ([y (cadr x)])
+                 (if (cadr x) (string-append y) "")))
+             -String]
+       [tc-e (let ()
+               (: x (Listof (U #f String)))
+               (define x (list "foo" "bar"))
+               (let ([z x]
+                     [y (cadr x)])
+                 (if (cadr z) (string-append y) "")))
+             -String]
+       [tc-e (let ()
+               (: x (Listof (Listof (U #f String))))
+               (define x (list (list "foo")))
+               (let ([y (caar x)])
+                 (if (caar x) (string-append y) "")))
+             -String]
+       [tc-e (let ()
+               (: x (Listof (Listof (Listof (U #f String)))))
+               (define x (list (list (list "foo"))))
+               (let ([y (caaar x)])
+                 (if (caaar x) (string-append y) "")))
+             -String]
+       [tc-e (let ()
+               (: x (Listof (Listof (U #f String))))
+               (define x (list (list "foo" "bar")))
+               (let ([y (cadar x)])
+                 (if (cadar x) (string-append y) "")))
+             -String]
+       [tc-e (let ()
+               (: x (Listof (Listof (U #f String))))
+               (define x (list (list "foo") (list "bar")))
+               (let ([y (caadr x)])
+                 (if (caadr x) (string-append y) "")))
+             -String]
+       [tc-e (let ()
+               (: x (Listof (U #f String)))
+               (define x (list "foo" "bar" "baz"))
+               (let ([y (caddr x)])
+                 (if (caddr x) (string-append y) "")))
+             -String]
+       [tc-e (let ()
+               (: x (Listof (Listof (Listof (Listof (U #f String))))))
+               (define x (list (list (list (list "foo")))))
+               (let ([y (caaaar x)])
+                 (if (caaaar x) (string-append y) "")))
+             -String]
+       [tc-e (let ()
+               (: x (Listof (Listof (Listof (U #f String)))))
+               (define x (list (list (list "foo" "bar"))))
+               (let ([y (cadaar x)])
+                 (if (cadaar x) (string-append y) "")))
+             -String]
+       [tc-e (let ()
+               (: x (Listof (Listof (Listof (U #f String)))))
+               (define x (list (list (list "foo") (list "bar"))))
+               (let ([y (caadar x)])
+                 (if (caadar x) (string-append y) "")))
+             -String]
+       [tc-e (let ()
+               (: x (Listof (Listof (U #f String))))
+               (define x (list (list "foo" "bar" "baz")))
+               (let ([y (caddar x)])
+                 (if (caddar x) (string-append y) "")))
+             -String]
+       [tc-e (let ()
+               (: x (Listof (Listof (Listof (U #f String)))))
+               (define x (list (list (list "foo"))
+                               (list (list "bar"))))
+               (let ([y (caaadr x)])
+                 (if (caaadr x) (string-append y) "")))
+             -String]
+       [tc-e (let ()
+               (: x (Listof (Listof (U #f String))))
+               (define x (list (list) (list)
+                               (list "foo")))
+               (let ([y (cadadr x)])
+                 (if (cadadr x) (string-append y) "")))
+             -String]
+       [tc-e (let ()
+               (: x (Listof (U #f String)))
+               (define x (list "foo" "bar" "baz" "quux"))
+               (let ([y (cadddr x)])
+                 (if (cadddr x) (string-append y) "")))
+             -String]
+
        )
 
   (test-suite
